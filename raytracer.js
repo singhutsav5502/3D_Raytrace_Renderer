@@ -15,17 +15,17 @@ const SCENE = {
   },
   lighting: {
     ambientLight: new ambientLight(
-      new Color(Math.random()*0.5, Math.random()*0.5, Math.random()*0.5),
+      new Color(Math.random() * 0.5, Math.random() * 0.5, Math.random() * 0.5),
       new Color(0, 0, 0),
     ),
     pointLights: [
       new pointLight(
-        new Vector3(-3, -0.5, +500), // location
+        new Vector3(-3, -0.5, -100), // location
         new Color(0.8, 0.3, 0.3), // ia
         new Color(0.1, 0.1, 0.1) // is
       ),
       new pointLight(
-        new Vector3(3, 2, -500), // location
+        new Vector3(3, 2, -100), // location
         new Color(0.4, 0.4, 0.9), // ia 
         new Color(0.1, 0.1, 0.1) // is
       )
@@ -38,7 +38,8 @@ const SCENE = {
       const sphereInstance = new Sphere(
         Math.floor((Math.random() - 1 / 2) * 60), // x
         Math.floor(((Math.random() - 1 / 2) * 80)), // y
-        Math.floor(Math.random() * 200 - (Math.random() + 500) * (1 / 2)), // z
+        Math.floor((Math.random()-100)),
+        // Math.floor(Math.random() * 200 - (Math.random() + 500) * (1 / 2)), // z
         Math.floor((Math.random()) * 15)) // radius
 
       sphereInstance._setColor(new Color(Math.random(), Math.random(), Math.random())) // color
@@ -66,8 +67,8 @@ class RayTracer {
     this.h = h
   }
 
-  findIntersectingSphere(ray, camera, center, radius) {
-    // Calculat
+  findIntersectingSphere(ray, center, radius, shadowRay = false) {
+    // Calculate
     const a = Vector3.dotProduct(ray.direction, ray.direction)
     const b = 2 * Vector3.dotProduct(ray.origin.minus(center), ray.direction)
     const c = Vector3.dotProduct(ray.origin.minus(center), ray.origin.minus(center)) - radius * radius
@@ -77,9 +78,9 @@ class RayTracer {
     if (D < 0) return { found: false, parameter: null };
     // Real roots make sure t>=1 so that intersection between image plane and camera are not considered
     D = Math.sqrt(D)
-    const t1 = (-1 * b + D) / (2 * a) >= 1 ? (-1 * b + D) / (2 * a) : false;
-    const t2 = (-1 * b - D) / (2 * a) >= 1 ? (-1 * b - D) / (2 * a) : false;
-    //  make sure t>=1 considered
+    const t1 = shadowRay ? ((-1 * b + D) / (2 * a) > 0 && (-1 * b + D) / (2 * a) < 1 ? (-1 * b + D) / (2 * a) : false) : ((-1 * b + D) / (2 * a) >= 1 ? (-1 * b + D) / (2 * a) : false);
+    const t2 = shadowRay ? ((-1 * b - D) / (2 * a) > 0 && (-1 * b - D) / (2 * a) < 1 ? (-1 * b - D) / (2 * a) : false) : ((-1 * b - D) / (2 * a) >= 1 ? (-1 * b - D) / (2 * a) : false);
+    //  make sure t>=1 considered for normal rays
     if (t1 === false && t2 === false) return { found: false, parameter: null }
     else if (t1 === false) return { found: true, parameter: t2 };
     else if (t2 === false) return { found: true, parameter: t1 };
@@ -114,7 +115,7 @@ class RayTracer {
     // run intersection for each object in the scene per raycast
     // store intersection object index and distanceParameter in array
     SCENE.objectsInScene.forEach((sphere, index) => {
-      const intersection = this.findIntersectingSphere(ray, SCENE.camera, sphere.center, sphere.radius)
+      const intersection = this.findIntersectingSphere(ray, sphere.center, sphere.radius)
       if (intersection.found === true) {
         intersectionParameters.push({ intersectionParameter: intersection.parameter, index })
       }
@@ -141,28 +142,43 @@ class RayTracer {
       SCENE.lighting.pointLights.forEach((pointLight) => {
 
         const lightVector = Vector3.normalize(pointLight.location.minus(pointOfIntersection))
-        const normalLightDotProduct = Vector3.dotProduct(normalVector, lightVector);
-        if (normalLightDotProduct > 0) {
-          // when light and normal vector in similar directions
 
-          //////////////////////
-          // DIFFUSE LIGHTING //
-          //////////////////////
+        // CHECK IF POINT IS IN SHADOW OF ANOTHER OBJECT ( FOR THIS PARTICULAR LIGHT )
+        const shadowRay = new Ray(pointOfIntersection, pointLight.location.minus(pointOfIntersection))
 
-          const diffuseComponent = intersectedSphere.material.kd.multiply(pointLight.id).scale(normalLightDotProduct);
-          tracedColor = tracedColor._addColorComponent(diffuseComponent)
+        let foundOverlap = false
+        SCENE.objectsInScene.forEach((sphere) => {
+          if (sphere !== intersectedSphere) {
+            const intersection = this.findIntersectingSphere(shadowRay, sphere.center, sphere.radius, true)
+            if (intersection.found === true) foundOverlap = true;
+          }
+        })
+        if (foundOverlap === false) {
 
-          ///////////////////////
-          // SPECULAR LIGHTING //
-          ///////////////////////
 
-          const reflectanceFactor = normalVector.scale(2 * normalLightDotProduct).minus(lightVector)
-          const viewVector = Vector3.normalize(SCENE.camera.minus(pointOfIntersection))
+          const normalLightDotProduct = Vector3.dotProduct(normalVector, lightVector);
+          if (normalLightDotProduct > 0) {
+            // when light and normal vector in similar directions
 
-          let specularComponent = intersectedSphere.material.ks.multiply(pointLight.is).scale(
-            Math.pow(Vector3.dotProduct(reflectanceFactor, viewVector), intersectedSphere.material.alpha)
-          )
-          tracedColor = tracedColor._addColorComponent(specularComponent)
+            //////////////////////
+            // DIFFUSE LIGHTING //
+            //////////////////////
+
+            const diffuseComponent = intersectedSphere.material.kd.multiply(pointLight.id).scale(normalLightDotProduct);
+            tracedColor = tracedColor._addColorComponent(diffuseComponent)
+
+            ///////////////////////
+            // SPECULAR LIGHTING //
+            ///////////////////////
+
+            const reflectanceFactor = normalVector.scale(2 * normalLightDotProduct).minus(lightVector)
+            const viewVector = Vector3.normalize(SCENE.camera.minus(pointOfIntersection))
+
+            let specularComponent = intersectedSphere.material.ks.multiply(pointLight.is).scale(
+              Math.pow(Vector3.dotProduct(reflectanceFactor, viewVector), intersectedSphere.material.alpha)
+            )
+            tracedColor = tracedColor._addColorComponent(specularComponent)
+          }
         }
       })
 
