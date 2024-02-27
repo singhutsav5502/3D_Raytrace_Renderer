@@ -20,4 +20,18 @@ class Color {
 
     )
   }
+  scale(factor){
+    return new Color(
+      this.r * factor,
+      this.g * factor,
+      this.b * factor,
+    )
+  }
+  static clampColors(color) {
+    return new Color(
+      Math.min(Math.max(color.r, 0), 1),
+      Math.min(Math.max(color.g, 0), 1),
+      Math.min(Math.max(color.b, 0), 1),
+    )
+  }
 }

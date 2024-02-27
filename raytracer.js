@@ -3,9 +3,6 @@
 const WIDTH = window.innerWidth;
 const HEIGHT = window.innerHeight;
 
-const GLOBALS = {
-  ia: 0.4,
-}
 const SCENE = {
   objectsInScene: [],
   numberOfSpheres: 3,
@@ -17,14 +14,20 @@ const SCENE = {
     bottomRight: new Vector3(1.52, -0.86, -0.5)
   },
   lighting: {
-    ambientLight: new ambientLight(new Color(Math.random(), Math.random(), Math.random()), GLOBALS.ia),
+    ambientLight: new ambientLight(
+      new Color(Math.random()*0.5, Math.random()*0.5, Math.random()*0.5),
+      new Color(0, 0, 0),
+    ),
     pointLights: [
       new pointLight(
-        WIDTH, // x 
-        HEIGHT/2,// y
-        -200, // z
-        0.8, // id
-        0.4, // is
+        new Vector3(-3, -0.5, +500), // location
+        new Color(0.8, 0.3, 0.3), // ia
+        new Color(0.1, 0.1, 0.1) // is
+      ),
+      new pointLight(
+        new Vector3(3, 2, -500), // location
+        new Color(0.4, 0.4, 0.9), // ia 
+        new Color(0.1, 0.1, 0.1) // is
       )
     ]
   },
@@ -42,14 +45,10 @@ const SCENE = {
 
       sphereInstance._setMaterial(
         new Material(
-          {
-            r: Math.random(),
-            g: Math.random(),
-            b: Math.random(),
-          }, // ka
-          Math.random() + 0.2, // kd
-          Math.random(), // ks
-          Math.random() + 0.2 // alpha
+          new Color(0.1, 0.1, 0.1),
+          new Color(0.5, 0.5, 0.9),
+          new Color(0.7, 0.7, 0.7),
+          10// alpha
         )
       )
 
@@ -70,8 +69,8 @@ class RayTracer {
   findIntersectingSphere(ray, camera, center, radius) {
     // Calculat
     const a = Vector3.dotProduct(ray.direction, ray.direction)
-    const b = 2 * Vector3.dotProduct(camera.minus(center), ray.direction)
-    const c = Vector3.dotProduct(camera.minus(center), camera.minus(center)) - radius * radius
+    const b = 2 * Vector3.dotProduct(ray.origin.minus(center), ray.direction)
+    const c = Vector3.dotProduct(ray.origin.minus(center), ray.origin.minus(center)) - radius * radius
     let D = ((b * b) - (4 * a * c))
 
     //  NO REAL ROOTS
@@ -131,34 +130,54 @@ class RayTracer {
       // found closest intersection with SCENE.objectsInScene[sphereIndex]
       const intersectedSphere = SCENE.objectsInScene[sphereIndex]
       Object.assign(tracedColor, intersectedSphere.color)
+      // AMBIENT LIGHT
+      tracedColor._addColorComponent(SCENE.lighting.ambientLight.color.multiply(SCENE.lighting.ambientLight.ia))
 
       // // CONSIDER PHONG SHADING MODEL FOR COLOR
-      const pointOfIntersection = SCENE.camera.plus(ray.direction)
+      const pointOfIntersection = ray.origin.plus(ray.direction.scale(intersectionParameters[0].intersectionParameter))
       const normalVector = Vector3.normalize(pointOfIntersection.minus(intersectedSphere.center))
 
 
       SCENE.lighting.pointLights.forEach((pointLight) => {
 
         const lightVector = Vector3.normalize(pointLight.location.minus(pointOfIntersection))
-        if (Vector3.dotProduct(normalVector, lightVector) > 0) {
+        const normalLightDotProduct = Vector3.dotProduct(normalVector, lightVector);
+        if (normalLightDotProduct > 0) {
           // when light and normal vector in similar directions
-          const diffuseFactor = intersectedSphere.material.kd * pointLight.id * Vector3.dotProduct(normalVector, lightVector);
-          const diffuseComponent = new Color(diffuseFactor, diffuseFactor, diffuseFactor)
+
+          //////////////////////
+          // DIFFUSE LIGHTING //
+          //////////////////////
+
+          const diffuseComponent = intersectedSphere.material.kd.multiply(pointLight.id).scale(normalLightDotProduct);
           tracedColor = tracedColor._addColorComponent(diffuseComponent)
+
+          ///////////////////////
+          // SPECULAR LIGHTING //
+          ///////////////////////
+
+          const reflectanceFactor = normalVector.scale(2 * normalLightDotProduct).minus(lightVector)
+          const viewVector = Vector3.normalize(SCENE.camera.minus(pointOfIntersection))
+
+          let specularComponent = intersectedSphere.material.ks.multiply(pointLight.is).scale(
+            Math.pow(Vector3.dotProduct(reflectanceFactor, viewVector), intersectedSphere.material.alpha)
+          )
+          tracedColor = tracedColor._addColorComponent(specularComponent)
         }
       })
 
 
     }
+    Color.clampColors(tracedColor)
     return tracedColor;
   }
 
 
 }
 
-//////////////////
+/////////////////
 // SCENE SETUP //
-//////////////////
+/////////////////
 const image = new Image(WIDTH, HEIGHT);
 document.image = image;
 SCENE.setupObjects();
