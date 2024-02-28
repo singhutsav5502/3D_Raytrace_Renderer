@@ -27,7 +27,7 @@ class Material {
             1,
             1.5,
             200,
-            1,
+            0.8,
         )
     }
     static _DefaultMaterial() {
