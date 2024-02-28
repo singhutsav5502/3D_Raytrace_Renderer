@@ -20,11 +20,18 @@ class Color {
 
     )
   }
-  scale(factor){
+  scale(factor) {
     return new Color(
       this.r * factor,
       this.g * factor,
       this.b * factor,
+    )
+  }
+  plus(other){
+    return new Color(
+      this.r + other.r,
+      this.g + other.g,
+      this.b + other.b,
     )
   }
   static clampColors(color) {
@@ -33,5 +40,8 @@ class Color {
       Math.min(Math.max(color.g, 0), 1),
       Math.min(Math.max(color.b, 0), 1),
     )
+  }
+  static mix(start, end, factor) {
+    return start.scale(1 - factor).plus(end.scale(factor));
   }
 }
