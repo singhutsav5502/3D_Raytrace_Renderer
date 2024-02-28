@@ -22,12 +22,12 @@ class Material {
         return new Material(
             new Color(1, 1, 1),
             new Color(1, 1, 1),
-            new Color(0.2, 0.2, 0.2),
+            new Color(1, 1, 1),
             new Color(0, 0, 0),
-            1,
-            1.5,
+            0.6, // transparency
+            1.5, // mu
             200,
-            0.8,
+            0.5// opacity
         )
     }
     static _DefaultMaterial() {

@@ -5,8 +5,8 @@ const HEIGHT = window.innerHeight;
 
 const SCENE = {
   objectsInScene: [],
-  numberOfSpheres: 10,
-  backgroundColor: new Color(0.25, 0.5, 0.5),
+  numberOfSpheres: 5,
+  backgroundColor: new Color(0.2, 0.2, 0.2),
   camera: new Vector3(0, 0, 2),
   imagePlane: {
     topLeft: new Vector3(-1.52, 0.86, -0.5),
@@ -23,12 +23,12 @@ const SCENE = {
       new pointLight(
         new Vector3(-300, -0.5, 0), // location
         new Color(0.8, 0.3, 0.3), // id
-        new Color(0.5, 0.5, 0.5) // is
+        new Color(0.8, 0.8, 0.8) // is
       ),
       new pointLight(
         new Vector3(300, 0.5, 0), // location
         new Color(0.4, 0.4, 0.9), // id
-        new Color(0.5, 0.5, 0.5) // is
+        new Color(0.8, 0.8, 0.8) // is
       )
     ]
   },
@@ -248,7 +248,7 @@ class RayTracer {
 
             // Refraction
             if (objectTransparency > 0) {
-              tracedColor = Color.mix(reflectedColorComponent, intersectedSphere.color, 0)
+              tracedColor = Color.mix(intersectedSphere.color, reflectedColorComponent, objectTransparency) // remove most of own color if transparency present
 
               const objectRI = intersectedSphere.material.mu
               if (objectRI > 1) {
@@ -258,8 +258,8 @@ class RayTracer {
 
                 // TRANSPARENCY
                 const blendedOpacity = Math.max(0.1, this.easingCurve(intersectedSphere.radius)) * (1 - fresnelFactor) + fresnelFactor;
-                pixelOpacity = Math.min((1 - blendedOpacity) * 0.5 + 1 * blendedOpacity, intersectedSphere.material.opacity)
-
+                pixelOpacity = Math.min((1 - blendedOpacity) * 1 + intersectedSphere.material.opacity * blendedOpacity, intersectedSphere.material.opacity) + intersectedSphere.material.opacity
+                // pixelOpacity = Math.min(1,pixelOpacity)
                 if ((isNaN(cosTheta2)) || ((SCENE.mu * cosTheta1) < objectRI && Math.abs(cosTheta1) > (1 / objectRI))) {
                   // Total Internal Reflection or imaginary value for cosTheta2
 
@@ -268,8 +268,8 @@ class RayTracer {
                     pointOfIntersection,
                     TIR_RAY_DIRECTION
                   )
-                  let TIR_Color_Component = this.tracedValueAtPixel(TIR_RAY, SCENE, depth - 1).pixelColor;
-                  TIR_Color_Component = Color.mix(TIR_Color_Component, SCENE.backgroundColor, 0.8)
+                  let TIR_Color_Component = this.tracedValueAtPixel(TIR_RAY, SCENE, depth - 2).pixelColor;
+                  TIR_Color_Component = Color.mix(TIR_Color_Component, SCENE.backgroundColor, fresnelFactor)
 
                   tracedColor = Color.mix(TIR_Color_Component, tracedColor, 0.2);
 
@@ -282,7 +282,7 @@ class RayTracer {
                     refractedRayDirection
                   )
 
-                  const refractedColorComponent = Color.mix(this.tracedValueAtPixel(refractedRay, SCENE, depth - 1).pixelColor, (SCENE.backgroundColor), 0.9)
+                  const refractedColorComponent = Color.mix(this.tracedValueAtPixel(refractedRay, SCENE, depth - 1).pixelColor, (SCENE.backgroundColor), fresnelFactor)
                   tracedColor = Color.mix(refractedColorComponent, tracedColor, 0.2);
                 }
               }
