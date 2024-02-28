@@ -15,19 +15,19 @@ const SCENE = {
   },
   lighting: {
     ambientLight: new ambientLight(
-      new Color(Math.random() * 0.5, Math.random() * 0.5, Math.random() * 0.5),
-      new Color(0, 0, 0),
+      new Color(Math.random() * 1, Math.random() * 1, Math.random() * 1),
+      new Color(0.05, 0.05, 0.05),
     ),
     pointLights: [
       new pointLight(
         new Vector3(-3, -0.5, -100), // location
-        new Color(0.8, 0.3, 0.3), // ia
-        new Color(0.1, 0.1, 0.1) // is
+        new Color(0.8, 0.3, 0.3), // id
+        new Color(0.2, 0.2, 0.2) // is
       ),
       new pointLight(
-        new Vector3(3, 2, -100), // location
-        new Color(0.4, 0.4, 0.9), // ia 
-        new Color(0.1, 0.1, 0.1) // is
+        new Vector3(3, 2, -80), // location
+        new Color(0.4, 0.4, 0.9), // id
+        new Color(0.2, 0.2, 0.2) // is
       )
     ]
   },
@@ -38,7 +38,7 @@ const SCENE = {
       const sphereInstance = new Sphere(
         Math.floor((Math.random() - 1 / 2) * 60), // x
         Math.floor(((Math.random() - 1 / 2) * 80)), // y
-        Math.floor((Math.random()-100)),
+        -100 + Math.random() * 3,
         // Math.floor(Math.random() * 200 - (Math.random() + 500) * (1 / 2)), // z
         Math.floor((Math.random()) * 15)) // radius
 
@@ -49,7 +49,7 @@ const SCENE = {
           new Color(0.1, 0.1, 0.1),
           new Color(0.5, 0.5, 0.9),
           new Color(0.7, 0.7, 0.7),
-          10// alpha
+          100// alpha
         )
       )
 
@@ -67,7 +67,12 @@ class RayTracer {
     this.h = h
   }
 
-  findIntersectingSphere(ray, center, radius, shadowRay = false) {
+  findIntersectingSphere(ray, center, radius, depth, shadowRay = false) {
+    // reflection and refraction depth call breaking condition
+    if (depth <= 0) {
+      return { found: false, parameter: null };
+    }
+
     // Calculate
     const a = Vector3.dotProduct(ray.direction, ray.direction)
     const b = 2 * Vector3.dotProduct(ray.origin.minus(center), ray.direction)
@@ -108,14 +113,14 @@ class RayTracer {
     )
     return ray;
   }
-  tracedValueAtPixel(x, y) {
-    const ray = this.createRay(x, y)
+  tracedValueAtPixel(ray, SCENE, depth = 3) {
+
     // intersection logic
     const intersectionParameters = []
     // run intersection for each object in the scene per raycast
     // store intersection object index and distanceParameter in array
     SCENE.objectsInScene.forEach((sphere, index) => {
-      const intersection = this.findIntersectingSphere(ray, sphere.center, sphere.radius)
+      const intersection = this.findIntersectingSphere(ray, sphere.center, sphere.radius, depth)
       if (intersection.found === true) {
         intersectionParameters.push({ intersectionParameter: intersection.parameter, index })
       }
@@ -131,8 +136,9 @@ class RayTracer {
       // found closest intersection with SCENE.objectsInScene[sphereIndex]
       const intersectedSphere = SCENE.objectsInScene[sphereIndex]
       Object.assign(tracedColor, intersectedSphere.color)
+
       // AMBIENT LIGHT
-      tracedColor._addColorComponent(SCENE.lighting.ambientLight.color.multiply(SCENE.lighting.ambientLight.ia))
+      tracedColor = tracedColor._addColorComponent(SCENE.lighting.ambientLight.color.multiply(SCENE.lighting.ambientLight.ia))
 
       // // CONSIDER PHONG SHADING MODEL FOR COLOR
       const pointOfIntersection = ray.origin.plus(ray.direction.scale(intersectionParameters[0].intersectionParameter))
@@ -146,14 +152,14 @@ class RayTracer {
         // CHECK IF POINT IS IN SHADOW OF ANOTHER OBJECT ( FOR THIS PARTICULAR LIGHT )
         const shadowRay = new Ray(pointOfIntersection, pointLight.location.minus(pointOfIntersection))
 
-        let foundOverlap = false
+        let isShadowed = false
         SCENE.objectsInScene.forEach((sphere) => {
           if (sphere !== intersectedSphere) {
-            const intersection = this.findIntersectingSphere(shadowRay, sphere.center, sphere.radius, true)
-            if (intersection.found === true) foundOverlap = true;
+            const intersection = this.findIntersectingSphere(shadowRay, sphere.center, sphere.radius, depth, true)
+            if (intersection.found === true) isShadowed = true;
           }
         })
-        if (foundOverlap === false) {
+        if (isShadowed === false) {
 
 
           const normalLightDotProduct = Vector3.dotProduct(normalVector, lightVector);
@@ -165,19 +171,39 @@ class RayTracer {
             //////////////////////
 
             const diffuseComponent = intersectedSphere.material.kd.multiply(pointLight.id).scale(normalLightDotProduct);
-            tracedColor = tracedColor._addColorComponent(diffuseComponent)
+            tracedColor = tracedColor._addColorComponent(diffuseComponent.scale(0.8))
 
             ///////////////////////
             // SPECULAR LIGHTING //
             ///////////////////////
 
-            const reflectanceFactor = normalVector.scale(2 * normalLightDotProduct).minus(lightVector)
+            const specularFactor = normalVector.scale(2 * normalLightDotProduct).minus(lightVector)
             const viewVector = Vector3.normalize(SCENE.camera.minus(pointOfIntersection))
 
             let specularComponent = intersectedSphere.material.ks.multiply(pointLight.is).scale(
-              Math.pow(Vector3.dotProduct(reflectanceFactor, viewVector), intersectedSphere.material.alpha)
+              Math.pow(Vector3.dotProduct(specularFactor, viewVector), intersectedSphere.material.alpha)
             )
             tracedColor = tracedColor._addColorComponent(specularComponent)
+
+            ////////////////////////
+            // RECURSIVE RAYTRACE //
+            ////////////////////////
+
+            // Reflectiveness and Refraction //
+            if (depth > 0) {
+
+              //  Reflection
+              const reflectionViewVector = Vector3.normalize(ray.direction.scale(-1))
+              const reflectanceVector = normalVector.scale(2 * Vector3.dotProduct(reflectionViewVector, normalVector)).minus(reflectionViewVector)
+              const reflectRay = new Ray(
+                pointOfIntersection,
+                reflectanceVector
+              )
+
+              const reflectedColorComponent = this.tracedValueAtPixel(reflectRay, SCENE, depth - 1);
+              // console.log(reflectedColorComponent)
+              tracedColor = tracedColor._addColorComponent(reflectedColorComponent.multiply(intersectedSphere.material.kt).scale(0.1))
+            }
           }
         }
       })
@@ -185,6 +211,7 @@ class RayTracer {
 
     }
     Color.clampColors(tracedColor)
+    // if(tracedColor.r || tracedColor.g || tracedColor.b ) console.log(tracedColor)
     return tracedColor;
   }
 
@@ -210,7 +237,8 @@ const tracer = new RayTracer(SCENE, WIDTH, HEIGHT);
 // for each pixel in the image plane run a ray trace and get corresponding color value for the pixel based on intersection detection
 for (let y = 0; y < HEIGHT; y++) {
   for (let x = 0; x < WIDTH; x++) {
-    image.putPixel(x, y, imageColorFromColor(tracer.tracedValueAtPixel(x, y)));
+    const ray = tracer.createRay(x, y)
+    image.putPixel(x, y, imageColorFromColor(tracer.tracedValueAtPixel(ray, SCENE)));
   }
 }
 
