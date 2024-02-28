@@ -5,7 +5,8 @@ const HEIGHT = window.innerHeight;
 
 const SCENE = {
   objectsInScene: [],
-  numberOfSpheres: 3,
+  numberOfSpheres: 5,
+  backgroundColor: new Color(0.8, 0.8, 0.8),
   camera: new Vector3(0, 0, 2),
   imagePlane: {
     topLeft: new Vector3(-1.52, 0.86, -0.5),
@@ -22,16 +23,16 @@ const SCENE = {
       new pointLight(
         new Vector3(-3, -0.5, -100), // location
         new Color(0.8, 0.3, 0.3), // id
-        new Color(0.2, 0.2, 0.2) // is
+        new Color(0.8, 0.8, 0.8) // is
       ),
       new pointLight(
-        new Vector3(3, 2, -80), // location
+        new Vector3(3, 0.5, 0), // location
         new Color(0.4, 0.4, 0.9), // id
-        new Color(0.2, 0.2, 0.2) // is
+        new Color(0.8, 0.8, 0.8) // is
       )
     ]
   },
-
+  mu: 1,
 
   setupObjects: function () {
     for (let i = 1; i <= this.numberOfSpheres; i++) {
@@ -48,13 +49,18 @@ const SCENE = {
         new Material(
           new Color(0.1, 0.1, 0.1),
           new Color(0.5, 0.5, 0.9),
-          new Color(0.7, 0.7, 0.7),
+          new Color(0.8, 0.8, 0.8),
+          new Color(0.5, 0.5, 0.5),
+          Math.random() * 0, // transparency
+          Math.random() + 1, // mu
           100// alpha
         )
       )
 
       this.objectsInScene.push(sphereInstance);
     }
+    // 1 transparent sphere
+    this.objectsInScene.push(new Sphere(0, 0, -100, 20, Material._TransparentMaterial()))
   }
 };
 
@@ -91,6 +97,8 @@ class RayTracer {
     else if (t2 === false) return { found: true, parameter: t1 };
     else return { found: true, parameter: Math.min(t1, t2) }
   }
+
+
   createRay(x, y) {
     // create ray ( normalize coordinates to [0,1] for x , flip coordinates for y to start from bottom left)
     const xt = x / this.w;
@@ -113,10 +121,31 @@ class RayTracer {
     )
     return ray;
   }
+
+  fresnelFactor(thetaI, eta1, eta2, p) {
+    const cosThetaI = Math.cos(thetaI);
+    const etaRatio = eta1 / eta2;
+    const sin2ThetaI = 1 - Math.pow(cosThetaI, 2);
+    const etaRatio2 = Math.pow(etaRatio, 2);
+    const term1 = Math.pow((etaRatio - Math.sqrt(etaRatio2 + sin2ThetaI)), 2);
+    const term2 = Math.pow((etaRatio + Math.sqrt(etaRatio2 + sin2ThetaI)), 2);
+
+    return (p === 'p' ? term1 : term2) / (term1 + term2);
+  }
+  easingCurve(radius) {
+    if (radius < 0) {
+      throw new Error("Radius cannot be negative.");
+    }
+
+    const clampedRadius = Math.max(radius, 0.001); // Clamp to avoid division by zero
+    return 0.1 + (1 - 0.1) * (3 * clampedRadius ** 2 - 2 * clampedRadius ** 3);
+  }
+
   tracedValueAtPixel(ray, SCENE, depth = 3) {
 
     // intersection logic
     const intersectionParameters = []
+    let pixelOpacity = 1;
     // run intersection for each object in the scene per raycast
     // store intersection object index and distanceParameter in array
     SCENE.objectsInScene.forEach((sphere, index) => {
@@ -135,7 +164,14 @@ class RayTracer {
       const sphereIndex = intersectionParameters[0].index
       // found closest intersection with SCENE.objectsInScene[sphereIndex]
       const intersectedSphere = SCENE.objectsInScene[sphereIndex]
+
       Object.assign(tracedColor, intersectedSphere.color)
+      // Transparency
+      const objectTransparency = intersectedSphere.material.transparency
+      if (objectTransparency > 0) {
+        tracedColor = tracedColor._addColorComponent(Color.mix(tracedColor, SCENE.backgroundColor, objectTransparency))
+      }
+
 
       // AMBIENT LIGHT
       tracedColor = tracedColor._addColorComponent(SCENE.lighting.ambientLight.color.multiply(SCENE.lighting.ambientLight.ia))
@@ -189,8 +225,12 @@ class RayTracer {
             // RECURSIVE RAYTRACE //
             ////////////////////////
 
-            // Reflectiveness and Refraction //
+            // Reflectiveness, Transparency and Refraction //
             if (depth > 0) {
+              const thetaI = Math.acos(Vector3.dotProduct(Vector3.normalize(ray.direction), normalVector)); // Angle of incidence
+              let fresnelFactor = this.fresnelFactor(thetaI, SCENE.mu, intersectedSphere.material.mu, 'p');
+              fresnelFactor = Math.min(fresnelFactor, 0.5);
+
 
               //  Reflection
               const reflectionViewVector = Vector3.normalize(ray.direction.scale(-1))
@@ -200,20 +240,63 @@ class RayTracer {
                 reflectanceVector
               )
 
-              const reflectedColorComponent = this.tracedValueAtPixel(reflectRay, SCENE, depth - 1);
-              // console.log(reflectedColorComponent)
+              const reflectedColorComponent = this.tracedValueAtPixel(reflectRay, SCENE, depth - 1).pixelColor;
               tracedColor = tracedColor._addColorComponent(reflectedColorComponent.multiply(intersectedSphere.material.kt).scale(0.1))
+
+              // Refraction
+              if (objectTransparency > 0) {
+                tracedColor = Color.mix(reflectedColorComponent, intersectedSphere.color, 0)
+
+                const objectRI = intersectedSphere.material.mu
+                if (objectRI > 1) {
+                  const cosTheta1 = Vector3.dotProduct(Vector3.normalize(ray.direction), normalVector)
+                  const refractiveRatio = SCENE.mu / objectRI
+                  const cosTheta2 = Math.sqrt(1 - Math.pow(refractiveRatio, 2) * (1 - Math.pow(cosTheta1, 2)))
+
+                  // TRANSPARENCY
+                  const blendedOpacity = Math.max(0.1, this.easingCurve(intersectedSphere.radius)) * (1 - fresnelFactor) + fresnelFactor;
+                  pixelOpacity = Math.min((1 - blendedOpacity) * 0.5 + 1 * blendedOpacity, intersectedSphere.material.opacity)
+
+                  if ((isNaN(cosTheta2)) || ((SCENE.mu * cosTheta1) < objectRI && Math.abs(cosTheta1) > (1 / objectRI))) {
+                    // Total Internal Reflection or imaginary value for cosTheta2
+
+                    const TIR_RAY_DIRECTION = Vector3.normalize(ray.direction.minus(normalVector.scale(Vector3.dotProduct(ray.direction, normalVector))))
+                    const TIR_RAY = new Ray(
+                      pointOfIntersection,
+                      TIR_RAY_DIRECTION
+                    )
+                    let TIR_Color_Component = this.tracedValueAtPixel(TIR_RAY, SCENE, depth - 1).pixelColor;
+                    TIR_Color_Component = Color.mix(TIR_Color_Component, SCENE.backgroundColor, 0.8)
+
+                    tracedColor = Color.mix(TIR_Color_Component, tracedColor, 0.2);
+
+                  }
+                  else {
+                    const refractiveRatio = SCENE.mu / objectRI
+                    const refractedRayDirection = ray.direction.scale(refractiveRatio).minus(normalVector.scale(refractiveRatio * (cosTheta1) + cosTheta2))
+                    const refractedRay = new Ray(
+                      pointOfIntersection,
+                      refractedRayDirection
+                    )
+
+                    const refractedColorComponent = Color.mix(this.tracedValueAtPixel(refractedRay, SCENE, depth - 1).pixelColor, (SCENE.backgroundColor), 0.9)
+                    tracedColor = Color.mix(refractedColorComponent, tracedColor, 0.2);
+                  }
+                }
+              }
             }
           }
         }
       })
-
-
+    }
+    else {
+      tracedColor = Object.assign(tracedColor, SCENE.backgroundColor)
     }
     Color.clampColors(tracedColor)
     // if(tracedColor.r || tracedColor.g || tracedColor.b ) console.log(tracedColor)
-    return tracedColor;
+    return { pixelColor: tracedColor, pixelOpacity }
   }
+
 
 
 }
@@ -238,7 +321,8 @@ const tracer = new RayTracer(SCENE, WIDTH, HEIGHT);
 for (let y = 0; y < HEIGHT; y++) {
   for (let x = 0; x < WIDTH; x++) {
     const ray = tracer.createRay(x, y)
-    image.putPixel(x, y, imageColorFromColor(tracer.tracedValueAtPixel(ray, SCENE)));
+    const pixelData = tracer.tracedValueAtPixel(ray, SCENE)
+    image.putPixel(x, y, imageColorFromColor(pixelData.pixelColor), pixelData.pixelOpacity);
   }
 }
 
