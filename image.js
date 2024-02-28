@@ -24,12 +24,12 @@ class Image {
     }
 
 
-    putPixel(x, y, color) {
+    putPixel(x, y, color, opacity = 1) {
         const offset = (y * this.w + x) * 4;
         this.canvas.pixels[offset] = color.r | 0;
         this.canvas.pixels[offset + 1] = color.g | 0;
         this.canvas.pixels[offset + 2] = color.b | 0;
-        this.canvas.pixels[offset + 3] = 255;
+        this.canvas.pixels[offset + 3] = opacity * 255;
     }
 
     renderIntoElement(elem) {
