@@ -194,7 +194,7 @@ class RayTracer {
         const lightVector = Vector3.normalize(pointLight.location.minus(pointOfIntersection))  // Vector from object towards light source
         const isInShadow = this.isInShadow(pointOfIntersection, pointLight, SCENE, intersectedSphere)
         if (isInShadow === false) {
-
+          //  not shadowed by another object
 
           const normalLightDotProduct = Vector3.dotProduct(normalVector, lightVector); // cos theta angle between Normal of object and the lightVector
           if (normalLightDotProduct > 0) { // makes sure the the light Vector and the normal from object are roughly in the same direction , i.e. object faces the light

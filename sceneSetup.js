@@ -5,7 +5,7 @@ const HEIGHT = window.innerHeight;
 const SCENE = {
     objectsInScene: [],
     numberOfSpheres: 3,
-    backgroundColor: new Color(0.5, 0.5, 0.5),
+    backgroundColor: new Color(0.75, 0.75, 0.75),
     camera: new Vector3(0, 0, 2),
     imagePlane: {
         topLeft: new Vector3(-1.52, 0.86, -0.5),
@@ -81,12 +81,23 @@ const imageColorFromColor = color => ({
 
 const tracer = new RayTracer(SCENE, WIDTH, HEIGHT);
 
+function FourXSSAA(x, y, WIDTH, HEIGHT, image, SCENE) {
+    const alpha = 1 / WIDTH;
+    const beta = 1 / HEIGHT;
+
+    const pixelDataOne = tracer.tracedValueAtPixel(tracer.createRay(x, y), SCENE).pixelColor
+    const pixelDataTwo = tracer.tracedValueAtPixel(tracer.createRay(x + alpha / 2, y), SCENE).pixelColor
+    const pixelDataThree = tracer.tracedValueAtPixel(tracer.createRay(x + alpha / 2, y + beta / 2), SCENE).pixelColor
+    const pixelDataFour = tracer.tracedValueAtPixel(tracer.createRay(x, y + beta / 2), SCENE).pixelColor
+    let pixelData = new Color(0, 0, 0)
+    pixelData = pixelData._addColorComponent(pixelDataOne)._addColorComponent(pixelDataTwo)._addColorComponent(pixelDataThree)._addColorComponent(pixelDataFour).scale(0.25) // average of all 4
+
+    image.putPixel(x, y, imageColorFromColor(pixelData), pixelDataOne.pixelOpacity);
+}
 // for each pixel in the image plane run a ray trace and get corresponding color value for the pixel based on intersection detection
 for (let y = 0; y < HEIGHT; y++) {
     for (let x = 0; x < WIDTH; x++) {
-        const ray = tracer.createRay(x, y)
-        const pixelData = tracer.tracedValueAtPixel(ray, SCENE)
-        image.putPixel(x, y, imageColorFromColor(pixelData.pixelColor), pixelData.pixelOpacity);
+        FourXSSAA(x, y, WIDTH, HEIGHT, image, SCENE)
     }
 }
 
