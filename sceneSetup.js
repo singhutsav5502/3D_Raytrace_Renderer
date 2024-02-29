@@ -4,7 +4,7 @@ const HEIGHT = window.innerHeight;
 
 const SCENE = {
     objectsInScene: [],
-    numberOfSpheres: 10,
+    numberOfSpheres: 3,
     backgroundColor: new Color(0.5, 0.5, 0.5),
     camera: new Vector3(0, 0, 2),
     imagePlane: {
