@@ -22,9 +22,9 @@ class Material {
         return new Material(
             new Color(1, 1, 1),
             new Color(1, 1, 1),
-            new Color(1, 1, 1),
             new Color(0, 0, 0),
-            0.6, // transparency
+            new Color(0, 0, 0),
+            0.9, // transparency
             1.5, // mu
             200,
             0.5// opacity
@@ -34,11 +34,12 @@ class Material {
         return new Material(
             new Color(1, 1, 1),
             new Color(1, 1, 1),
-            new Color(0, 0, 0),
+            new Color(1, 1, 1),
+            new Color(1, 1, 1),
             0,
             1,
             200,
-            0,
+            1,
         )
     }
 }
