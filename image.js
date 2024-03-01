@@ -20,4 +20,17 @@ class Image {
         this.pixels[offset + 2] = color.b | 0;
         this.pixels[offset + 3] = opacity * 255;
     }
+    clear() {
+        // Fill all pixel data with zeros (transparent black)
+        for (let i = 0; i < this.pixels.length; i += 4) {
+            this.pixels[i] = 0; // Red
+            this.pixels[i + 1] = 0; // Green
+            this.pixels[i + 2] = 0; // Blue
+            this.pixels[i + 3] = 0; // Alpha (transparent)
+        }
+
+        // Update the canvas context with the cleared pixel data
+        this.context.putImageData(this.imageData, 0, 0);
+    }
+
 }
