@@ -5,7 +5,7 @@ const HEIGHT = window.innerHeight;
 let SCENE = {
     objectsInScene: [],
     numberOfSpheres: 3,
-    backgroundColorRGB: [255*0.7, 255*0.7, 255*0.7],
+    backgroundColorRGB: [255 * 0.7, 255 * 0.7, 255 * 0.7],
     backgroundColor: new Color(0.7, 0.7, 0.7),
     camera: new Vector3(0, 0, 2),
     imagePlane: {
@@ -36,6 +36,7 @@ let SCENE = {
     mu: 1,
 
     setupObjects: function () {
+        this.objectsInScene = []
         this.backgroundColor = RGBtoColorVector(this.backgroundColorRGB)
         this.lighting.ambientLight = new ambientLight(
             RGBtoColorVector(this.lighting.ambientLightColor),
@@ -81,7 +82,8 @@ let SCENE = {
 const sceneRender = {
     image: new Image(WIDTH, HEIGHT, true),
     Render_Scene: function () {
-        document.getElementById('renderText').innerText="Rendering....";
+        this.image.context.fillRect(0, 0, this.image.w, this.image.h)
+        document.getElementById('renderText').innerText = "Rendering....";
         SCENE.setupObjects();
         const tracer = new RayTracer(SCENE, WIDTH, HEIGHT);
         const BLOCK_SIZE = 100; // Update blocks of pixels
@@ -92,7 +94,7 @@ const sceneRender = {
                         const pixelX = x + dx;
                         const pixelY = y + dy;
 
-                        tracer.FourXSSAA(tracer, pixelX, pixelY, WIDTH, HEIGHT, this.image, SCENE);
+                        tracer.FourXSSAA(pixelX, pixelY, WIDTH, HEIGHT, this.image, SCENE);
                     }
                 }
             }
