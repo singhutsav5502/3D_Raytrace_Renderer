@@ -2,9 +2,10 @@
 const WIDTH = window.innerWidth;
 const HEIGHT = window.innerHeight;
 
-const SCENE = {
+let SCENE = {
     objectsInScene: [],
     numberOfSpheres: 3,
+    backgroundColorRGB: [255*0.7, 255*0.7, 255*0.7],
     backgroundColor: new Color(0.7, 0.7, 0.7),
     camera: new Vector3(0, 0, 2),
     imagePlane: {
@@ -14,9 +15,10 @@ const SCENE = {
         bottomRight: new Vector3(1.52, -0.86, -0.5)
     },
     lighting: {
+        ambientLightColor: [255, 255, 255],
         ambientLight: new ambientLight(
             new Color(Math.random() * 1, Math.random() * 1, Math.random() * 1),
-            new Color(0.05, 0.05, 0.05),
+            new Color(0.8, 0.8, 0.8),
         ),
         pointLights: [
             new pointLight(
@@ -34,6 +36,11 @@ const SCENE = {
     mu: 1,
 
     setupObjects: function () {
+        this.backgroundColor = RGBtoColorVector(this.backgroundColorRGB)
+        this.lighting.ambientLight = new ambientLight(
+            RGBtoColorVector(this.lighting.ambientLightColor),
+            new Color(0.8, 0.8, 0.8),
+        )
         for (let i = 1; i <= this.numberOfSpheres; i++) {
             const sphereInstance = new Sphere(
                 Math.floor((Math.random() - 1 / 2) * 60), // x
@@ -46,7 +53,7 @@ const SCENE = {
 
             sphereInstance._setMaterial(
                 new Material(
-                    new Color(0.1, 0.1, 0.1),
+                    new Color(1, 1, 1),
                     new Color(0.5, 0.5, 0.9),
                     new Color(1, 1, 1),
                     new Color(0.8, 0.8, 0.8),
@@ -68,38 +75,37 @@ const SCENE = {
 /////////////////
 // SCENE SETUP //
 /////////////////
-const image = new Image(WIDTH, HEIGHT, false);
-const onScreenImage = new Image(WIDTH, HEIGHT, true);
-// document.image = image;
-SCENE.setupObjects();
 
-//  color vector stores values from 0 to 1 , convert into 0 to 255 range
-const imageColorFromColor = color => ({
-    r: Math.floor(color.r * 255),
-    g: Math.floor(color.g * 255),
-    b: Math.floor(color.b * 255)
-});
-
-const tracer = new RayTracer(SCENE, WIDTH, HEIGHT);
 
 // for each pixel in the image plane run a ray trace and get corresponding color value for the pixel based on intersection detection
-window.onload = function () {
-    const BLOCK_SIZE = 100; // Update blocks of pixels
-    document.getElementById('loadingText').style.display = "block";
-    for (let y = 0; y < HEIGHT; y += BLOCK_SIZE) {
-        for (let x = 0; x < WIDTH; x += BLOCK_SIZE) {
-            for (let dy = 0; dy < BLOCK_SIZE; dy++) {
-                for (let dx = 0; dx < BLOCK_SIZE; dx++) {
-                    const pixelX = x + dx;
-                    const pixelY = y + dy;
+const sceneRender = {
+    image: new Image(WIDTH, HEIGHT, true),
+    Render_Scene: function () {
+        document.getElementById('renderText').innerText="Rendering....";
+        SCENE.setupObjects();
+        const tracer = new RayTracer(SCENE, WIDTH, HEIGHT);
+        const BLOCK_SIZE = 100; // Update blocks of pixels
+        for (let y = 0; y < HEIGHT; y += BLOCK_SIZE) {
+            for (let x = 0; x < WIDTH; x += BLOCK_SIZE) {
+                for (let dy = 0; dy < BLOCK_SIZE; dy++) {
+                    for (let dx = 0; dx < BLOCK_SIZE; dx++) {
+                        const pixelX = x + dx;
+                        const pixelY = y + dy;
 
-                    tracer.FourXSSAA(pixelX, pixelY, WIDTH, HEIGHT, image, SCENE);
+                        tracer.FourXSSAA(tracer, pixelX, pixelY, WIDTH, HEIGHT, this.image, SCENE);
+                    }
                 }
             }
         }
+        this.image.context.putImageData(this.image.imageData, 0, 0)
+        document.getElementById('renderText').style.display = "none";
+        console.log('finished render')
     }
-    onScreenImage.context.putImageData(image.imageData, 0, 0)
-    document.getElementById('loadingText').style.display = "none";
-    console.log('yo')
-
 }
+
+// GUI
+let gui = new dat.GUI({ name: 'userControls' });
+gui.add(SCENE, 'numberOfSpheres')
+gui.addColor(SCENE, 'backgroundColorRGB')
+gui.addColor(SCENE.lighting, 'ambientLightColor')
+gui.add(sceneRender, 'Render_Scene')
