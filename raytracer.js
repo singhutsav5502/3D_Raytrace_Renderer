@@ -160,120 +160,133 @@ class RayTracer {
     pixelColor = Color.mix(TIR_Color_Component, pixelColor, 0.2);
     return pixelColor
   }
-  tracedValueAtPixel(ray, SCENE, depth = 3) {
+  FourXSSAA(x, y, WIDTH, HEIGHT, image, SCENE) {
+  const alpha = 1 / WIDTH;
+  const beta = 1 / HEIGHT;
 
-    // intersection logic
-    const intersectionParameters = this.getIntersectingSpheres(ray, SCENE, depth)
-    let pixelOpacity = 1;
+  const pixelDataOne = tracer.tracedValueAtPixel(tracer.createRay(x, y), SCENE).pixelColor
+  const pixelDataTwo = tracer.tracedValueAtPixel(tracer.createRay(x + alpha / 2, y), SCENE).pixelColor
+  const pixelDataThree = tracer.tracedValueAtPixel(tracer.createRay(x + alpha / 2, y + beta / 2), SCENE).pixelColor
+  const pixelDataFour = tracer.tracedValueAtPixel(tracer.createRay(x, y + beta / 2), SCENE).pixelColor
+  let pixelData = new Color(0, 0, 0)
+  pixelData = pixelData._addColorComponent(pixelDataOne)._addColorComponent(pixelDataTwo)._addColorComponent(pixelDataThree)._addColorComponent(pixelDataFour).scale(0.25) // average of all 4
 
-    // use array to find closest intersection to camera
-    let pixelColor = new Color(0, 0, 0)
+  image.putPixel(x, y, imageColorFromColor(pixelData), pixelDataOne.pixelOpacity);
+}
+tracedValueAtPixel(ray, SCENE, depth = 3) {
+
+  // intersection logic
+  const intersectionParameters = this.getIntersectingSpheres(ray, SCENE, depth)
+  let pixelOpacity = 1;
+
+  // use array to find closest intersection to camera
+  let pixelColor = new Color(0, 0, 0)
 
 
-    if (this.didRayIntersect(intersectionParameters)) {
+  if (this.didRayIntersect(intersectionParameters)) {
 
-      const sphereIndex = intersectionParameters[0].index // get index of object closest to the camera ( that was intersected )
-      const intersectedSphere = SCENE.objectsInScene[sphereIndex]
+    const sphereIndex = intersectionParameters[0].index // get index of object closest to the camera ( that was intersected )
+    const intersectedSphere = SCENE.objectsInScene[sphereIndex]
 
-      Object.assign(pixelColor, intersectedSphere.color)
+    Object.assign(pixelColor, intersectedSphere.color)
 
-      // Transparency
-      const objectTransparency = intersectedSphere.material.transparency
-      pixelColor = this.addTransparency(objectTransparency, pixelColor)
+    // Transparency
+    const objectTransparency = intersectedSphere.material.transparency
+    pixelColor = this.addTransparency(objectTransparency, pixelColor)
 
-      // AMBIENT LIGHT
-      pixelColor = this.addAmbientLight(SCENE, pixelColor)
+    // AMBIENT LIGHT
+    pixelColor = this.addAmbientLight(SCENE, pixelColor)
 
-      // CONSIDER PHONG SHADING MODEL FOR COLOR DIFFUSION AND SPECULARITY
+    // CONSIDER PHONG SHADING MODEL FOR COLOR DIFFUSION AND SPECULARITY
 
-      const pointOfIntersection = this.getPointOfIntersection(ray, intersectionParameters)
-      const normalVector = Vector3.normalize(pointOfIntersection.minus(intersectedSphere.center))
+    const pointOfIntersection = this.getPointOfIntersection(ray, intersectionParameters)
+    const normalVector = Vector3.normalize(pointOfIntersection.minus(intersectedSphere.center))
 
-      //  diffuse and specular components are affected by all lights
-      SCENE.lighting.pointLights.forEach((pointLight) => {
-        const lightVector = Vector3.normalize(pointLight.location.minus(pointOfIntersection))  // Vector from object towards light source
-        const isInShadow = this.isInShadow(pointOfIntersection, pointLight, SCENE, intersectedSphere)
-        if (isInShadow === false) {
-          //  not shadowed by another object
+    //  diffuse and specular components are affected by all lights
+    SCENE.lighting.pointLights.forEach((pointLight) => {
+      const lightVector = Vector3.normalize(pointLight.location.minus(pointOfIntersection))  // Vector from object towards light source
+      const isInShadow = this.isInShadow(pointOfIntersection, pointLight, SCENE, intersectedSphere)
+      if (isInShadow === false) {
+        //  not shadowed by another object
 
-          const normalLightDotProduct = Vector3.dotProduct(normalVector, lightVector); // cos theta angle between Normal of object and the lightVector
-          if (normalLightDotProduct > 0) { // makes sure the the light Vector and the normal from object are roughly in the same direction , i.e. object faces the light
+        const normalLightDotProduct = Vector3.dotProduct(normalVector, lightVector); // cos theta angle between Normal of object and the lightVector
+        if (normalLightDotProduct > 0) { // makes sure the the light Vector and the normal from object are roughly in the same direction , i.e. object faces the light
 
-            // when object faces light
+          // when object faces light
 
-            //////////////////////
-            // DIFFUSE LIGHTING //
-            //////////////////////
+          //////////////////////
+          // DIFFUSE LIGHTING //
+          //////////////////////
 
-            pixelColor = this.addDifuseLighting(intersectedSphere, pixelColor, pointLight, normalLightDotProduct)
+          pixelColor = this.addDifuseLighting(intersectedSphere, pixelColor, pointLight, normalLightDotProduct)
 
-            ///////////////////////
-            // SPECULAR LIGHTING //
-            ///////////////////////
+          ///////////////////////
+          // SPECULAR LIGHTING //
+          ///////////////////////
 
-            pixelColor = this.addSpecularLighting(intersectedSphere, pixelColor, pointLight, normalLightDotProduct, pointOfIntersection, lightVector, normalVector)
-          }
+          pixelColor = this.addSpecularLighting(intersectedSphere, pixelColor, pointLight, normalLightDotProduct, pointOfIntersection, lightVector, normalVector)
         }
-      })
+      }
+    })
 
 
-      ////////////////////////
-      // RECURSIVE RAYTRACE //
-      ////////////////////////
+    ////////////////////////
+    // RECURSIVE RAYTRACE //
+    ////////////////////////
 
-      // Reflectiveness, Transparency and Refraction //
-      if (depth > 0) {
-        //  Reflection
+    // Reflectiveness, Transparency and Refraction //
+    if (depth > 0) {
+      //  Reflection
 
-        const { pixelColorAfterReflection, reflectedColorComponent } = this.addReflectingComponents(ray, normalVector, pointOfIntersection, SCENE, depth, intersectedSphere, pixelColor) // recursive calls to add color of reflected objects
-        pixelColor = pixelColorAfterReflection
+      const { pixelColorAfterReflection, reflectedColorComponent } = this.addReflectingComponents(ray, normalVector, pointOfIntersection, SCENE, depth, intersectedSphere, pixelColor) // recursive calls to add color of reflected objects
+      pixelColor = pixelColorAfterReflection
 
-        // Refraction
-        if (objectTransparency > 0) {
+      // Refraction
+      if (objectTransparency > 0) {
 
-          const objectRI = intersectedSphere.material.mu
-          const thetaI = Math.acos(Vector3.dotProduct(Vector3.normalize(ray.direction), normalVector)); // Angle of incidence
-          let fresnelFactor = this.fresnelFactor(thetaI, SCENE.mu, objectRI, 'p');
-          fresnelFactor = Math.min(fresnelFactor, 0.5);
+        const objectRI = intersectedSphere.material.mu
+        const thetaI = Math.acos(Vector3.dotProduct(Vector3.normalize(ray.direction), normalVector)); // Angle of incidence
+        let fresnelFactor = this.fresnelFactor(thetaI, SCENE.mu, objectRI, 'p');
+        fresnelFactor = Math.min(fresnelFactor, 0.5);
 
-          pixelColor = Color.mix(intersectedSphere.color, reflectedColorComponent, objectTransparency) // remove most of object color if transparency present
+        pixelColor = Color.mix(intersectedSphere.color, reflectedColorComponent, objectTransparency) // remove most of object color if transparency present
 
-          if (objectRI > 1) {
-            // SNELL's LAW
-            const cosTheta1 = Vector3.dotProduct(Vector3.normalize(ray.direction), normalVector)
+        if (objectRI > 1) {
+          // SNELL's LAW
+          const cosTheta1 = Vector3.dotProduct(Vector3.normalize(ray.direction), normalVector)
+          const refractiveRatio = SCENE.mu / objectRI
+          const cosTheta2 = Math.sqrt(1 - Math.pow(refractiveRatio, 2) * (1 - Math.pow(cosTheta1, 2)))
+
+          // TRANSPARENCY
+          pixelOpacity = this.adjustPixelOpacity(pixelOpacity, intersectedSphere, fresnelFactor)
+
+          if (this.isTotalInternalReflection(cosTheta2, cosTheta1, SCENE, objectRI)) {
+            // Total Internal Reflection or imaginary value for cosTheta2
+            pixelColor = this.handleTotalInternalReflection(ray, normalVector, pointOfIntersection, SCENE, depth, fresnelFactor, pixelColor)
+          }
+          else {
             const refractiveRatio = SCENE.mu / objectRI
-            const cosTheta2 = Math.sqrt(1 - Math.pow(refractiveRatio, 2) * (1 - Math.pow(cosTheta1, 2)))
+            const refractedRayDirection = ray.direction.scale(refractiveRatio).minus(normalVector.scale(refractiveRatio * (cosTheta1) + cosTheta2))
+            const refractedRay = new Ray(
+              pointOfIntersection,
+              refractedRayDirection
+            )
 
-            // TRANSPARENCY
-            pixelOpacity = this.adjustPixelOpacity(pixelOpacity, intersectedSphere, fresnelFactor)
-
-            if (this.isTotalInternalReflection(cosTheta2, cosTheta1, SCENE, objectRI)) {
-              // Total Internal Reflection or imaginary value for cosTheta2
-              pixelColor = this.handleTotalInternalReflection(ray, normalVector, pointOfIntersection, SCENE, depth, fresnelFactor, pixelColor)
-            }
-            else {
-              const refractiveRatio = SCENE.mu / objectRI
-              const refractedRayDirection = ray.direction.scale(refractiveRatio).minus(normalVector.scale(refractiveRatio * (cosTheta1) + cosTheta2))
-              const refractedRay = new Ray(
-                pointOfIntersection,
-                refractedRayDirection
-              )
-
-              const refractedColorComponent = Color.mix(this.tracedValueAtPixel(refractedRay, SCENE, depth - 1).pixelColor, (SCENE.backgroundColor), fresnelFactor)
-              pixelColor = Color.mix(refractedColorComponent, pixelColor, 0.2);
-            }
+            const refractedColorComponent = Color.mix(this.tracedValueAtPixel(refractedRay, SCENE, depth - 1).pixelColor, (SCENE.backgroundColor), fresnelFactor)
+            pixelColor = Color.mix(refractedColorComponent, pixelColor, 0.2);
           }
         }
       }
     }
-    else {
-      // no object intersected
-      pixelColor = Object.assign(pixelColor, SCENE.backgroundColor)
-    }
-    Color.clampColors(pixelColor)
-    // if(pixelColor.r || pixelColor.g || pixelColor.b ) console.log(pixelColor)
-    return { pixelColor: pixelColor, pixelOpacity }
   }
+  else {
+    // no object intersected
+    pixelColor = Object.assign(pixelColor, SCENE.backgroundColor)
+  }
+  Color.clampColors(pixelColor)
+  // if(pixelColor.r || pixelColor.g || pixelColor.b ) console.log(pixelColor)
+  return { pixelColor: pixelColor, pixelOpacity }
+}
 
 
 

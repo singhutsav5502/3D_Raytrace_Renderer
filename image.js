@@ -1,47 +1,23 @@
 class Image {
-    constructor(w, h) {
-        this.w = w
-        this.h = h
-
-        this.canvas = this._setUpCanvas();
+    constructor(w, h, isVisible) {
+        this.w = w;
+        this.h = h;
+        this.canvas = document.createElement('canvas');
+        this.canvas.setAttribute('width', this.w);
+        this.canvas.setAttribute('height', this.h);
+        this.context = this.canvas.getContext('2d');
+        this.imageData = this.context.getImageData(0, 0, this.w, this.h);
+        this.pixels = this.imageData.data;
+        this.canvas.style.display = isVisible ? "block" : "none"
+        // Ensure the canvas is only appended once
+        document.querySelector('body').appendChild(this.canvas);
     }
-
-    _setUpCanvas() {
-        const canvas = document.createElement('canvas');
-        canvas.setAttribute('width', this.w);
-        canvas.setAttribute('height', this.h);
-
-        const context = canvas.getContext('2d');
-        const imageData = context.getImageData(0, 0, this.w, this.h);
-        const pixels = imageData.data;
-
-        return {
-            canvas,
-            context,
-            imageData,
-            pixels
-        };
-    }
-
 
     putPixel(x, y, color, opacity = 1) {
         const offset = (y * this.w + x) * 4;
-        this.canvas.pixels[offset] = color.r | 0;
-        this.canvas.pixels[offset + 1] = color.g | 0;
-        this.canvas.pixels[offset + 2] = color.b | 0;
-        this.canvas.pixels[offset + 3] = opacity * 255;
-    }
-
-    renderIntoElement(elem) {
-        this
-            .canvas
-            .context
-            .putImageData(
-                this.canvas.imageData,
-                0,
-                0
-            );
-
-        elem.appendChild(this.canvas.canvas);
+        this.pixels[offset] = color.r | 0;
+        this.pixels[offset + 1] = color.g | 0;
+        this.pixels[offset + 2] = color.b | 0;
+        this.pixels[offset + 3] = opacity * 255;
     }
 }
