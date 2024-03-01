@@ -45,3 +45,15 @@ class Color {
     return start.scale(1 - factor).plus(end.scale(factor));
   }
 }
+
+// Utils
+//  color vector stores values from 0 to 1 , convert into 0 to 255 range
+const imageColorFromColor = color => ({
+  r: Math.floor(color.r * 255),
+  g: Math.floor(color.g * 255),
+  b: Math.floor(color.b * 255)
+});
+
+function RGBtoColorVector(backgroundColorRGB) {
+  return new Color(backgroundColorRGB[0] / 255, backgroundColorRGB[1] / 255, backgroundColorRGB[2] / 255)
+};
