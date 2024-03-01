@@ -160,14 +160,14 @@ class RayTracer {
     pixelColor = Color.mix(TIR_Color_Component, pixelColor, 0.2);
     return pixelColor
   }
-  FourXSSAA(tracer, x, y, WIDTH, HEIGHT, image, SCENE) {
+  FourXSSAA(x, y, WIDTH, HEIGHT, image, SCENE) {
     const alpha = 1 / WIDTH;
     const beta = 1 / HEIGHT;
 
-    const pixelDataOne = tracer.tracedValueAtPixel(tracer.createRay(x, y), SCENE).pixelColor
-    const pixelDataTwo = tracer.tracedValueAtPixel(tracer.createRay(x + alpha / 2, y), SCENE).pixelColor
-    const pixelDataThree = tracer.tracedValueAtPixel(tracer.createRay(x + alpha / 2, y + beta / 2), SCENE).pixelColor
-    const pixelDataFour = tracer.tracedValueAtPixel(tracer.createRay(x, y + beta / 2), SCENE).pixelColor
+    const pixelDataOne = this.tracedValueAtPixel(this.createRay(x, y), SCENE).pixelColor
+    const pixelDataTwo = this.tracedValueAtPixel(this.createRay(x + alpha / 2, y), SCENE).pixelColor
+    const pixelDataThree = this.tracedValueAtPixel(this.createRay(x + alpha / 2, y + beta / 2), SCENE).pixelColor
+    const pixelDataFour = this.tracedValueAtPixel(this.createRay(x, y + beta / 2), SCENE).pixelColor
     let pixelData = new Color(0, 0, 0)
     pixelData = pixelData._addColorComponent(pixelDataOne)._addColorComponent(pixelDataTwo)._addColorComponent(pixelDataThree)._addColorComponent(pixelDataFour).scale(0.25) // average of all 4
 
@@ -200,7 +200,7 @@ class RayTracer {
       // CONSIDER PHONG SHADING MODEL FOR COLOR DIFFUSION AND SPECULARITY
 
       const pointOfIntersection = this.getPointOfIntersection(ray, intersectionParameters)
-      const normalVector = Vector3.normalize(pointOfIntersection.minus(intersectedSphere.center))
+      const normalVector = (pointOfIntersection.minus(intersectedSphere.center)).scale(1/intersectedSphere.radius) // unit normal vector by simply dividing by radius of sphere
 
       //  diffuse and specular components are affected by all lights
       SCENE.lighting.pointLights.forEach((pointLight) => {
