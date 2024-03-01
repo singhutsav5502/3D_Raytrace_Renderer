@@ -17,13 +17,18 @@
     </style>
 </head>
 <body>
-    <h1 id="loadingText" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) ">Loading!</h1>
+    <h1 id="renderText" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) ">Click On Render Scene!</h1>
+    <h1 id="loadingText" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); display:none ">Loading!</h1>
+    <!-- GUI -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js" integrity="sha512-WoO4Ih0CDOSLYafy22wZD/mcJ7k0ESLqtQsFa6zFKnEUrbtuGU+GkLtVhgt93xa2qewG5gKEC6CWlN8OaCTSVg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- utility classes -->
     <script src="color.js"      type="text/javascript"></script>
     <script src="vector.js"     type="text/javascript"></script>
     <script src="image.js"      type="text/javascript"></script>
     <script src="materials.js"  type="text/javascript"></script>
     <script src="lights.js"     type="text/javascript"></script>
     <script src="shapes.js"     type="text/javascript"></script>
+    <!-- raytrace and setup -->
     <script src="raytracer.js"  type="text/javascript"></script>
     <script src="sceneSetup.js" type="text/javascript"></script>
 </body>
